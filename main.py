@@ -55,6 +55,7 @@ ax.barh(names, y_data, color=generate_random_colors(len(y_data)))
 ax.set_xlabel("Hours")
 ax.set_ylabel("")
 ax.set_title("Check In/Out", fontsize=60)
+
 print((5 * int(y_data[len(y_data) - 1]) / 100))
 if (5 * int(y_data[len(y_data) - 1]) / 100) <= 0.5:
     ax.set_xticks(range(0, int(y_data[len(y_data) - 1]) + 1, 1))
@@ -67,8 +68,8 @@ canvas.draw()
 canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
 # Add a button to exit the program
-button = tk.Button(root, text="Exit", command=root.destroy)
-button.pack(side=tk.BOTTOM)
+# button = tk.Button(root, text="Exit", command=root.destroy)
+# button.pack(side=tk.BOTTOM)
 
 # Create a label to display the typed numbers
 label = tk.Label(root, text="")
@@ -80,6 +81,34 @@ def onKey(event):
     if event.char.isdigit():
         label.config(text=label.cget("text") + event.char)
 
+# Takes in string name outputs the ID it is tied to
+def getId(name):
+    for i in namesRe:
+        if namesRe[i] == name:
+            return i
+
+def updateData():
+    name2 = namesRe.values()
+    y_data2 = hours.values()
+    data2 = sorted(zip(name2, y_data2), key=lambda pair: pair[1], reverse=False)
+    names2, y_data2 = zip(*data2)
+    print(names2)
+    print(y_data2)
+
+    # Reset bar graphs
+    ax.clear()
+    ax.barh(names2, y_data2, color=generate_random_colors(len(y_data)))
+    ax.set_xlabel("Hours")
+    ax.set_ylabel("")
+    ax.set_title("Check In/Out", fontsize=60)
+    y_tick_labels = ax.get_yticklabels()
+
+    # Highlight logged in users
+    for number in names2:
+        if (getId(number) in ids.keys()) and (ids[getId(number)] is not None):
+            y_tick_labels[names2.index(number)].set_bbox(dict(facecolor='yellow', edgecolor='none'))
+
+    canvas.draw()
 
 # Function to handle "Enter" key press events
 def onEnter(event):
@@ -94,10 +123,18 @@ def onEnter(event):
             if number not in namesRe:
                 name = simpledialog.askstring("Input", "What is your name",
                                               parent=root)
+
+                while name in namesRe.values():
+                    name = simpledialog.askstring("Input", "What is your name (Must be unique)",
+                                              parent=root)
+                
                 namesRe[number] = name
                 namesReFile = open("namesRe.json", 'w')
                 namesReFile.write(json.dumps(namesRe))
                 namesReFile.close()
+            updateData()
+
+
 
         # If they are logged in
         else:
@@ -112,20 +149,7 @@ def onEnter(event):
             namesReFile2.write(json.dumps(hours))
             namesReFile2.close()
             ids[number] = None
-            name2 = namesRe.values()
-            y_data2 = hours.values()
-            data2 = sorted(zip(name2, y_data2), key=lambda pair: pair[1], reverse=False)
-            names2, y_data2 = zip(*data2)
-            print(names2)
-            print(y_data2)
-
-            # Reset bar graphs
-            ax.clear()
-            ax.barh(names2, y_data2, color=generate_random_colors(len(y_data)))
-            ax.set_xlabel("Hours")
-            ax.set_ylabel("")
-            ax.set_title("Check In/Out", fontsize=60)
-            canvas.draw()
+            updateData()
 
         label.config(text="")
 
@@ -174,5 +198,6 @@ schedule.every().day.at("19:00").do(clearAll)
 schedule.every().day.at("12:30").do(clearAll)
 
 root.after(33, loop)
+root.config(cursor="none")
 # Start the tkinter mainloop
 root.mainloop()
