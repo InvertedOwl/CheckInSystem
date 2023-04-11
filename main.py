@@ -8,6 +8,8 @@ import os.path
 import schedule
 import random
 
+currentLive = {}
+updateRate = 1  # Seconds Between Refresh
 
 # Acquire data
 if os.path.isfile("hours.json"):
@@ -35,8 +37,9 @@ print(y_data)
 root = tk.Tk()
 root.attributes('-fullscreen', True)
 
+
 def generate_random_colors(num):
-    colors = ["#D0C9C0", "#EFEAD8", "#6D8B74", "#5F7161"]
+    colors = ["#6D8B74", "#6D8B74", "#6D8B74", "#5F7161"]
     # Shuffle the list of colors
     random.shuffle(colors)
     # Repeat the list if num is greater than the length of the list
@@ -46,10 +49,11 @@ def generate_random_colors(num):
     result = colors[:num]
     return result
 
+
 # Create a matplotlib figure and plot the data as a horizontal bar graph
 fig = plt.Figure(figsize=(8, 6), dpi=100)
 ax = fig.add_subplot(111)
-ax.barh(names, y_data, color=generate_random_colors(len(y_data)))
+ax.barh(names, y_data, color="#6D8B74")
 
 # Set the x-axis and y-axis labels
 ax.set_xlabel("Hours")
@@ -60,7 +64,8 @@ print((5 * int(y_data[len(y_data) - 1]) / 100))
 if (5 * int(y_data[len(y_data) - 1]) / 100) <= 0.5:
     ax.set_xticks(range(0, int(y_data[len(y_data) - 1]) + 1, 1))
 else:
-    ax.set_xticks(range(0, int(y_data[len(y_data) - 1]) + int(round(5 * int(y_data[len(y_data) - 1]) / 100)), int(round(5 * int(y_data[len(y_data) - 1]) / 100))))
+    ax.set_xticks(range(0, int(y_data[len(y_data) - 1]) + int(round(5 * int(y_data[len(y_data) - 1]) / 100)),
+                        int(round(5 * int(y_data[len(y_data) - 1]) / 100))))
 
 # Create a tkinter canvas and add the matplotlib figure to it
 canvas = FigureCanvasTkAgg(fig, master=root)
@@ -81,23 +86,23 @@ def onKey(event):
     if event.char.isdigit():
         label.config(text=label.cget("text") + event.char)
 
+
 # Takes in string name outputs the ID it is tied to
 def getId(name):
     for i in namesRe:
         if namesRe[i] == name:
             return i
 
-def updateData():
-    name2 = namesRe.values()
-    y_data2 = hours.values()
+
+def updateData(names1, hours1):
+    name2 = names1.values()
+    y_data2 = hours1.values()
     data2 = sorted(zip(name2, y_data2), key=lambda pair: pair[1], reverse=False)
     names2, y_data2 = zip(*data2)
-    print(names2)
-    print(y_data2)
 
     # Reset bar graphs
     ax.clear()
-    ax.barh(names2, y_data2, color=generate_random_colors(len(y_data)))
+    ax.barh(names2, y_data2, color="#6D8B74")
     ax.set_xlabel("Hours")
     ax.set_ylabel("")
     ax.set_title("Check In/Out", fontsize=60)
@@ -110,13 +115,21 @@ def updateData():
 
     canvas.draw()
 
+
 # Function to handle "Enter" key press events
 def onEnter(event):
     number = label.cget("text")
     if number:
 
+        if number in currentLive:
+            currentLive.pop(number)
+
+
+        print(number)
+
         # If they are not logged in
         if number not in ids or ids[number] is None:
+
             ids[number] = datetime.now().timestamp()
 
             # If they do not have a name
@@ -126,13 +139,13 @@ def onEnter(event):
 
                 while name in namesRe.values():
                     name = simpledialog.askstring("Input", "What is your name (Must be unique)",
-                                              parent=root)
-                
+                                                  parent=root)
+
                 namesRe[number] = name
                 namesReFile = open("namesRe.json", 'w')
                 namesReFile.write(json.dumps(namesRe))
                 namesReFile.close()
-            updateData()
+            updateData(namesRe, hours)
 
 
 
@@ -149,7 +162,7 @@ def onEnter(event):
             namesReFile2.write(json.dumps(hours))
             namesReFile2.close()
             ids[number] = None
-            updateData()
+            updateData(namesRe, hours)
 
         label.config(text="")
 
@@ -158,15 +171,42 @@ def onEnter(event):
 root.bind('<KeyPress>', onKey)
 root.bind('<Return>', onEnter)
 
+
 # Checks time
 def loop():
     schedule.run_pending()
+    # updateData(namesRe, hours)
     root.after(33, loop)
+
+
+def updateTimes():
+    for i in namesRe:
+        if not i in currentLive:
+            if i in hours:
+                currentLive[i] = hours[i]
+            else:
+                currentLive[i] = 0
+
+        if i in ids and ids[i] is not None:
+            currentLive[i] += 0.000277778*updateRate
+
+    if len(currentLive) > 0:
+        newNamesRe = {}
+        for i in currentLive:
+            newNamesRe[i] = namesRe[i]
+
+        updateData(newNamesRe, currentLive)
+    root.after(1000*updateRate, updateTimes)
+
+
+updateTimes()
+
 
 # Log everyone out at certain times
 def clearAll():
     print("AUTO SIGN OUT")
     for number in ids:
+        currentLive.pop(number)
         if not ids[number] is None:
             print(number)
             tempHours = (datetime.now().timestamp() - ids[number]) / 3600
@@ -182,11 +222,9 @@ def clearAll():
             y_data2 = hours.values()
             data2 = sorted(zip(name2, y_data2), key=lambda pair: pair[1], reverse=False)
             names2, y_data2 = zip(*data2)
-            print(names2)
-            print(y_data2)
 
             ax.clear()
-            ax.barh(names2, y_data2, color=generate_random_colors(len(y_data)))
+            ax.barh(names2, y_data2, color="#6D8B74")
             ax.set_xlabel("Hours")
             ax.set_ylabel("")
             ax.set_title("Check In/Out", fontsize=60)
@@ -196,6 +234,7 @@ def clearAll():
 schedule.every().day.at("17:00").do(clearAll)
 schedule.every().day.at("19:00").do(clearAll)
 schedule.every().day.at("12:30").do(clearAll)
+schedule.every()
 
 root.after(33, loop)
 root.config(cursor="none")
